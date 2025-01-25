@@ -1,2 +1,2 @@
-# rituals
-Rituals
+rituals
+# Rituals
