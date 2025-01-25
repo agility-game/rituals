@@ -1,0 +1,73 @@
+name: Dynamic Note Generation
+
+on:
+  workflow_dispatch:
+    inputs:
+      template:
+        description: "Template to use"
+        required: true
+        type: choice
+        options:
+          - backlog-grooming
+          - retrospective
+          - pi-planning
+          - metrics-tracking
+          - dependency-tracking
+
+jobs:
+  generate-note:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate Note with Dynamic Date
+        env:
+          TEMPLATE: ${{ inputs.template }}
+          # Use the current date in the desired format
+          CURRENT_DATE: ${{ format('[[{0}]]', steps.date.outputs.date) }}
+        run: |
+          # Get current date
+          CURRENT_FULL_DATE=$(date +%Y-%m-%d)
+
+          # Define template files and output paths
+          case $TEMPLATE in
+            "backlog-grooming")
+              TEMPLATE_FILE="templates/backlog-grooming-template.md"
+              OUTPUT_FILE="Notes/Backlog-Grooming-$CURRENT_FULL_DATE.md"
+              ;;
+            "retrospective")
+              TEMPLATE_FILE="templates/retrospective-template.md"
+              OUTPUT_FILE="Notes/Retrospective-$CURRENT_FULL_DATE.md"
+              ;;
+            "pi-planning")
+              TEMPLATE_FILE="templates/pi-planning-template.md"
+              OUTPUT_FILE="Notes/PI-Planning-$CURRENT_FULL_DATE.md"
+              ;;
+            "metrics-tracking")
+              TEMPLATE_FILE="templates/metrics-tracking-template.md"
+              OUTPUT_FILE="Notes/Metrics-Tracking-$CURRENT_FULL_DATE.md"
+              ;;
+            "dependency-tracking")
+              TEMPLATE_FILE="templates/dependency-tracking-template.md"
+              OUTPUT_FILE="Notes/Dependency-Tracking-$CURRENT_FULL_DATE.md"
+              ;;
+            *)
+              echo "Invalid template selected"
+              exit 1
+              ;;
+          esac
+
+          # Create output directory if it doesn't exist
+          mkdir -p "Notes"
+
+          # Replace date placeholder in template
+          sed "s/\[\[{{DATE}}]\]/[[${CURRENT_FULL_DATE}]]/g" "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+
+          # Git configuration
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+
+          # Stage, commit, and push the new note
+          git add "$OUTPUT_FILE"
+          git commit -m "Generate $TEMPLATE Note for $CURRENT_FULL_DATE"
+          git push
