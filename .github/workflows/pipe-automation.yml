@@ -1,0 +1,67 @@
+name: PIPE Quarterly Automation
+
+on:
+  schedule:
+    - cron: '0 0 1 1,4,7,10 *'
+  workflow_dispatch:
+
+jobs:
+  update-pipe-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Determine Current Year and Quarter
+        id: date-info
+        run: |
+          CURRENT_YEAR=$(date +%Y)
+          CURRENT_MONTH=$(date +%m)
+          
+          if [[ $CURRENT_MONTH -ge 1 && $CURRENT_MONTH -le 3 ]]; then
+            CURRENT_QUARTER=1
+          elif [[ $CURRENT_MONTH -ge 4 && $CURRENT_MONTH -le 6 ]]; then
+            CURRENT_QUARTER=2
+          elif [[ $CURRENT_MONTH -ge 7 && $CURRENT_MONTH -le 9 ]]; then
+            CURRENT_QUARTER=3
+          else
+            CURRENT_QUARTER=4
+          fi
+          
+          echo "year=$CURRENT_YEAR" >> $GITHUB_OUTPUT
+          echo "quarter=$CURRENT_QUARTER" >> $GITHUB_OUTPUT
+
+      - name: Update PIPE Event Status
+        env:
+          CURRENT_YEAR: ${{ steps.date-info.outputs.year }}
+          CURRENT_QUARTER: ${{ steps.date-info.outputs.quarter }}
+        run: |
+          PIPE_FILE="Notes/Q$CURRENT_QUARTER-$CURRENT_YEAR-PIPE.md"
+          
+          if [ ! -f "$PIPE_FILE" ]; then
+            echo "PIPE event file for $CURRENT_YEAR Q$CURRENT_QUARTER does not exist."
+            exit 0
+          fi
+          
+          sed -i 's/Status: Not Started/Status: In Progress/g' "$PIPE_FILE"
+          sed -i 's/- \[ \] Executive Vision Presentation/- [/] Executive Vision Presentation/g' "$PIPE_FILE"
+          sed -i 's/- \[ \] Current Business Objectives Review/- [/] Current Business Objectives Review/g' "$PIPE_FILE"
+          
+          echo "## Automation Update" >> "$PIPE_FILE"
+          echo "- Updated at: $(date -u)" >> "$PIPE_FILE"
+
+      - name: Commit and Push Changes
+        env:
+          CURRENT_YEAR: ${{ steps.date-info.outputs.year }}
+          CURRENT_QUARTER: ${{ steps.date-info.outputs.quarter }}
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          git add "Notes/Q$CURRENT_QUARTER-$CURRENT_YEAR-PIPE.md"
+          git commit -m "Activate Q$CURRENT_QUARTER $CURRENT_YEAR PIPE Event"
+          
+          # Create and push a tag with the year
+          git tag -a "PIPE-$CURRENT_YEAR-Q$CURRENT_QUARTER" -m "PIPE Event for $CURRENT_YEAR Q$CURRENT_QUARTER"
+          git push origin "PIPE-$CURRENT_YEAR-Q$CURRENT_QUARTER"
+          git push
